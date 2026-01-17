@@ -13,7 +13,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from groq import Groq
 
-# --- 1. SOZLAMALAR ---
+# --- 1. SOZLAMALAR VA LOGGING ---
 logging.basicConfig(level=logging.INFO)
 
 # Secrets tekshiruvi
@@ -21,10 +21,10 @@ try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 except:
-    st.error("Secrets (BOT_TOKEN yoki GROQ_API_KEY) topilmadi!")
+    st.error("Secrets (BOT_TOKEN yoki GROQ_API_KEY) topilmadi! .streamlit/secrets.toml ni tekshiring.")
     st.stop()
 
-# --- 2. DATABASE ---
+# --- 2. DATABASE (SQLite) ---
 DB_NAME = "english_tutor.db"
 
 def init_db():
@@ -68,17 +68,22 @@ client = Groq(api_key=GROQ_API_KEY)
 
 def clean_json_string(json_string):
     """
-    AI ba'zan JSON atrofida ortiqcha matn yozadi. 
-    Bu funksiya faqat { ... } qismini ajratib oladi.
+    MUHIM: AI javobidan faqat JSON qismini ajratib oladi.
+    Markdown (```json ... ```) va ortiqcha gaplarni olib tashlaydi.
     """
     try:
-        # Birinchi '{' va oxirgi '}' ni topamiz
+        # Markdown belgilarini tozalash
+        json_string = json_string.replace("```json", "").replace("```", "").strip()
+        
+        # Birinchi '{' va oxirgi '}' ni topish
         start = json_string.find('{')
         end = json_string.rfind('}') + 1
+        
         if start != -1 and end != -1:
             return json_string[start:end]
         return json_string
-    except:
+    except Exception as e:
+        logging.error(f"JSON Cleaning Error: {e}")
         return json_string
 
 async def get_ai_explanation(topic, level):
@@ -93,11 +98,11 @@ async def get_ai_explanation(topic, level):
     try:
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-8192", # Tezroq va barqaror model
+            model="llama3-8b-8192", # Kichikroq model barqarorroq ishlaydi
         )
         return response.choices[0].message.content
     except Exception as e:
-        logging.error(f"Explanation Error: {e}")
+        logging.error(f"Explanation API Error: {e}")
         return "⚠️ AI hozir band. Iltimos, birozdan so'ng urinib ko'ring."
 
 async def generate_quiz_question(topic, level):
@@ -110,26 +115,29 @@ async def generate_quiz_question(topic, level):
         "correct_option_index": 0,
         "explanation": "Explanation in Uzbek"
     }}
-    IMPORTANT: Return ONLY the JSON. No other text.
+    IMPORTANT: Return ONLY the JSON object. Do not write "Here is the json".
     """
     try:
         response = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a backend API that returns only JSON."},
+                {"role": "system", "content": "You are a backend API that outputs strictly JSON."},
                 {"role": "user", "content": prompt}
             ],
             model="llama3-8b-8192",
-            temperature=0.5
+            temperature=0.3 # Pastroq harorat aniqroq JSON beradi
         )
         content = response.choices[0].message.content
-        logging.info(f"AI Raw Response: {content}") # Logga yozish (tekshirish uchun)
+        logging.info(f"AI Raw Response: {content}") 
         
-        # JSONni tozalash
+        # JSONni tozalash va o'qish
         clean_content = clean_json_string(content)
         return json.loads(clean_content)
         
+    except json.JSONDecodeError:
+        logging.error("JSON Decode Error: AI buzuq format yubordi")
+        return None
     except Exception as e:
-        logging.error(f"JSON Error: {e}")
+        logging.error(f"API Error: {e}")
         return None
 
 # --- 4. BOT STATES & LOGIC ---
@@ -143,12 +151,10 @@ class TutorStates(StatesGroup):
 
 # --- KLAVIATURALAR ---
 def main_menu_kb():
-    # Barcha Present Zamonlar
     kb = [
         [InlineKeyboardButton(text="🕒 Present Simple", callback_data="topic:Present Simple")],
         [InlineKeyboardButton(text="🏃 Present Continuous", callback_data="topic:Present Continuous")],
         [InlineKeyboardButton(text="✅ Present Perfect", callback_data="topic:Present Perfect")],
-        [InlineKeyboardButton(text="⏳ Present Perf. Cont.", callback_data="topic:Present Perfect Continuous")],
         [InlineKeyboardButton(text="📊 Mening Natijalarim", callback_data="profile")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
@@ -214,13 +220,14 @@ async def start_quiz(call: types.CallbackQuery, state: FSMContext):
     topic = data.get("current_topic")
     level = data.get("level")
     
-    await call.message.edit_text("🧠 AI yangi test tuzmoqda... (5-10 soniya)")
+    await call.message.edit_text("🧠 AI yangi test tuzmoqda... (Kuting)")
     
     quiz_data = await generate_quiz_question(topic, level)
     
     if not quiz_data:
+        # Xatolik bo'lsa bot "qulab tushmaydi", shunchaki xabar beradi
         await call.message.edit_text(
-            "⚠️ AI ulanishida xatolik. Iltimos, qaytadan bosing.", 
+            "⚠️ AI test tuza olmadi (Ehtimol API band). Qaytadan urinib ko'ring.", 
             reply_markup=quiz_control_kb()
         )
         return
@@ -234,22 +241,26 @@ async def start_quiz(call: types.CallbackQuery, state: FSMContext):
 # 3. Javobni tekshirish
 @dp.callback_query(F.data.startswith("ans:"), TutorStates.quiz)
 async def check_answer(call: types.CallbackQuery, state: FSMContext):
-    user_idx = int(call.data.split(":")[1])
-    data = await state.get_data()
-    correct_idx = data.get("correct_index")
-    explanation = data.get("explanation")
-    
-    if user_idx == correct_idx:
-        update_xp(call.from_user.id, 10)
-        msg = f"✅ **To'g'ri!** (+10 XP)\n\n{explanation}"
-    else:
-        msg = f"❌ **Xato.**\n\n{explanation}"
-    
-    kb = [
-        [InlineKeyboardButton(text="➡️ Keyingi savol", callback_data="start_quiz")],
-        [InlineKeyboardButton(text="🏠 Menyu", callback_data="menu")]
-    ]
-    await call.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode="Markdown")
+    try:
+        user_idx = int(call.data.split(":")[1])
+        data = await state.get_data()
+        correct_idx = data.get("correct_index")
+        explanation = data.get("explanation")
+        
+        if user_idx == correct_idx:
+            update_xp(call.from_user.id, 10)
+            msg = f"✅ **To'g'ri!** (+10 XP)\n\n{explanation}"
+        else:
+            msg = f"❌ **Xato.**\n\n{explanation}"
+        
+        kb = [
+            [InlineKeyboardButton(text="➡️ Keyingi savol", callback_data="start_quiz")],
+            [InlineKeyboardButton(text="🏠 Menyu", callback_data="menu")]
+        ]
+        await call.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode="Markdown")
+    except Exception as e:
+        logging.error(f"Answer Check Error: {e}")
+        await call.message.edit_text("Xatolik yuz berdi. Menyu tugmasini bosing.", reply_markup=main_menu_kb())
 
 # --- STARTUP ---
 async def start_polling():
@@ -265,5 +276,5 @@ def run_bot():
 
 st.title("🇬🇧 AI English Tutor Admin")
 st.write("Holati: **Ishlamoqda** 🟢")
-st.write("Telegramga o'tib, **/start** bosing.")
+st.write("Agat 'ModuleNotFoundError' chiqsa, 'Reboot App' qiling.")
 run_bot()
