@@ -1,5 +1,0 @@
-aiogram
-python-dotenv
-groq
-firebase-admin
-
