@@ -1,21 +1,22 @@
 import streamlit as st
 
-# Streamlit Secrets-dan ma'lumotlarni xavfsiz o'qish
+# 1. TOKENLARNI STREAMLIT SECRETS ORQALI OLISH
+# Streamlit Cloud panelida 'Settings -> Secrets' bo'limiga BOT_TOKEN qo'shilgan bo'lishi shart.
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-except Exception as e:
-    # Lokal testlar uchun (agar secrets topilmasa)
-    BOT_TOKEN = "TOKEN_YOKI_XATOLIK"
-    GROQ_API_KEY = "KALIT_YOKI_XATOLIK"
+except (KeyError, FileNotFoundError):
+    # Lokal testlar uchun placeholder
+    BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 
+# 2. ADMIN VA BAZA SOZLAMALARI
 ADMIN_ID = 1416457518
 DB_FILE = "bot_database.db"
 
-# Ovozlar bazasi (Multi-lang uchun maxsus bo'lim)
+# 3. OVOZLAR BAZASI (edge-tts modellaridan foydalaniladi)
+# Har bir til uchun Erkak va Ayol ovozlari sozlangan.
 VOICES = {
     "multi": {
-        "label": "🌐 Ko'p tilli (Aqlli Mix) ➡️",
+        "label": "🌐 Ko'p tilli (Smart Mix) ➡️",
         "voices": {
             "female_1": {"id": "uz-UZ-MadinaNeural", "name": "Madina & Aria (Mix)", "gender": "Ayol"},
             "male_1": {"id": "uz-UZ-SardorNeural", "name": "Sardor & Christopher (Mix)", "gender": "Erkak"},
@@ -36,6 +37,14 @@ VOICES = {
             "male_1": {"id": "en-US-ChristopherNeural", "name": "Christopher", "gender": "Erkak"},
         },
         "test_text": "This is a test audio for English."
+    },
+    "ar": {
+        "label": "🇸🇦 Arabcha",
+        "voices": {
+            "female_1": {"id": "ar-SA-ZariyahNeural", "name": "Zariyah", "gender": "Ayol"},
+            "male_1": {"id": "ar-SA-HamedNeural", "name": "Hamed", "gender": "Erkak"},
+        },
+        "test_text": "هذا تسجيل صوتي تجريبي للغة العربية"
     },
     "ru": {
         "label": "🇷🇺 Русский",
