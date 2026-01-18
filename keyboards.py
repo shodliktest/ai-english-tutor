@@ -17,8 +17,15 @@ def admin_menu():
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
-def lang_inline_kb():
+def lang_inline_kb(mode="translate"):
     kb = []
+    # 1. Rejimni ko'rsatuvchi yoki o'zgartiruvchi tugma
+    if mode == "translate":
+        kb.append([InlineKeyboardButton(text="📄 Asl holatda (Tarjimasiz) o'qish ➡️", callback_data="set_mode_original")])
+    else:
+        kb.append([InlineKeyboardButton(text="🌍 Tarjima qilish rejimiga o'tish ➡️", callback_data="set_mode_translate")])
+    
+    # 2. Tillar ro'yxati
     row = []
     for code, info in VOICES.items():
         row.append(InlineKeyboardButton(text=info['label'], callback_data=f"lang_{code}"))
@@ -26,6 +33,7 @@ def lang_inline_kb():
             kb.append(row)
             row = []
     if row: kb.append(row)
+    
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 def voices_inline_kb(lang_code):
@@ -36,13 +44,10 @@ def voices_inline_kb(lang_code):
     for v_key, v_val in voices.items():
         kb.append([InlineKeyboardButton(text=f"{v_val['name']}", callback_data=f"voice_{lang_code}_{v_key}")])
     
-    # 2. Tarjimasiz o'qish tugmasi (Asl holatda)
-    kb.append([InlineKeyboardButton(text="📄 Tarjimasiz (Asl matn)", callback_data=f"orig_{lang_code}")])
-    
-    # 3. Sinov rejimi (Oxiriga tushirildi)
+    # 2. Sinov rejimi (Oxiriga tushirildi)
     kb.append([InlineKeyboardButton(text="🔊 SINOV REJIMI", callback_data=f"test_{lang_code}")])
     
-    # 4. Ortga tugmasi
+    # 3. Ortga tugmasi
     kb.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_lang")])
     
     return InlineKeyboardMarkup(inline_keyboard=kb)
