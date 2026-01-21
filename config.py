@@ -1,25 +1,19 @@
 import streamlit as st
 
-# 1. TOKENLARNI STREAMLIT SECRETS ORQALI OLISH
-# Streamlit Cloud panelida 'Settings -> Secrets' bo'limiga BOT_TOKEN qo'shilgan bo'lishi shart.
 try:
     BOT_TOKEN = st.secrets["BOT_TOKEN"]
 except (KeyError, FileNotFoundError):
-    # Lokal testlar uchun placeholder
     BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 
-# 2. ADMIN VA BAZA SOZLAMALARI
 ADMIN_ID = 1416457518
 DB_FILE = "bot_database.db"
 
-# 3. OVOZLAR BAZASI (edge-tts modellaridan foydalaniladi)
-# Har bir til uchun Erkak va Ayol ovozlari sozlangan.
 VOICES = {
     "multi": {
         "label": "🌐 Ko'p tilli (Smart Mix) ➡️",
         "voices": {
-            "female_1": {"id": "uz-UZ-MadinaNeural", "name": "Madina & Aria (Mix)", "gender": "Ayol"},
-            "male_1": {"id": "uz-UZ-SardorNeural", "name": "Sardor & Christopher (Mix)", "gender": "Erkak"},
+            "female_1": {"id": "uz-UZ-MadinaNeural", "name": "Madina & Global (Mix)", "gender": "Ayol"},
+            "male_1": {"id": "uz-UZ-SardorNeural", "name": "Sardor & Global (Mix)", "gender": "Erkak"},
         }
     },
     "uz": {
@@ -37,6 +31,22 @@ VOICES = {
             "male_1": {"id": "en-US-ChristopherNeural", "name": "Christopher", "gender": "Erkak"},
         },
         "test_text": "This is a test audio for English."
+    },
+    "tr": {
+        "label": "🇹🇷 Turkcha",
+        "voices": {
+            "female_1": {"id": "tr-TR-EmelNeural", "name": "Emel", "gender": "Ayol"},
+            "male_1": {"id": "tr-TR-AhmetNeural", "name": "Ahmet", "gender": "Erkak"},
+        },
+        "test_text": "Bu Türk dili için bir test sesidir."
+    },
+    "ko": {
+        "label": "🇰🇷 Koreyscha",
+        "voices": {
+            "female_1": {"id": "ko-KR-SunHiNeural", "name": "Sun-Hi", "gender": "Ayol"},
+            "male_1": {"id": "ko-KR-BongJinNeural", "name": "Bong-Jin", "gender": "Erkak"},
+        },
+        "test_text": "이것은 한국어 테스트 오디오입니다."
     },
     "ar": {
         "label": "🇸🇦 Arabcha",
